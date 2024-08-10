@@ -1,66 +1,64 @@
-package ru.yandex.practicum.filmorate.src.main.controller;
+package main.controller;
 
-import ch.qos.logback.classic.Level;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import main.model.User;
+import main.interfaces.UserServiceImpl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.src.main.model.User;
-import ru.yandex.practicum.filmorate.src.main.storageService.UserService;
-import ru.yandex.practicum.filmorate.src.main.validator.Validator;
+import org.springframework.web.server.ResponseStatusException;
 
-
+import javax.validation.Valid;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-
-import static ru.yandex.practicum.filmorate.src.main.enums.StatusEnums.*;
 
 
 @RestController
-@RequestMapping("/api/filmorate")
+@RequestMapping("/api")
+@Slf4j
+@Validated
 public class UserController {
 
-    private static final Logger log = LoggerFactory.getLogger(Validator.class);
+    private UserServiceImpl userServiceImpl = new UserServiceImpl();
 
-    static {
-        ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME))
-                .setLevel(Level.INFO);
-    }
-    UserService userService = new UserService();
-    Validator validator = new Validator();
 
     @PostMapping("/user")
-    public String addUser(@RequestBody User user) {
-        log.info("Создание нового юзера");
-        if (validator.isValid(user)) {
-            boolean userCreated = userService.createUser(user);
-            log.debug("userCreated: " + String.valueOf(userCreated));
-            if (userCreated) {
-                log.trace("Имя пользователя: {}, Емайл пользователя: {}, Логин пользователя: {}, Дата рождения: {}",
-                        user.getName(), user.getEmail(), user.getLogin(), user.getBirthday());
-                return CREATE_STATUS.getDescription() + user.getName();
-            }
+    public ResponseEntity<User> addUser(@Valid @RequestBody User user) {
+        log.info("Создание юзера");
+        User userCreated = userServiceImpl.createUser(user);
+        if (userCreated != null) {
+            log.info("Юзер создан: {}", userCreated);
+            log.trace("User name: {}, Email: {}, Login: {}, Birthday: {}",
+                    user.getName(), user.getEmail(), user.getLogin(), user.getBirthday());
+            return ResponseEntity.ok().body(userCreated);
+        } else {
+            log.error("Юзер не был создан");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Ошибка создания юзера " + user.getName());
         }
-        return NOT_FOUND.getDescription();
     }
 
     @PutMapping("/user/{userId}")
-    public String updateUser(@RequestBody User user) {
-        log.info("Обновление юзера");
-        boolean userUpdated = userService.updateUser(user);
-        if (userUpdated) {
+    public ResponseEntity<User> updateUser(@Valid @RequestBody User user) {
+        log.info("Обновление юзера с ID: {}", user.getId());
+        User userUpdated = userServiceImpl.updateUser(user);
+        if (userUpdated != null) {
+            log.info("Юзер создан: {}", userUpdated);
             log.trace("Имя пользователя: {}, Емайл пользователя: {}, Логин пользователя: {}, Дата рождения: {}",
                     user.getName(), user.getEmail(), user.getLogin(), user.getBirthday());
-            return UPDATE_STATUS.getDescription();
+            return ResponseEntity.ok().build();
         } else {
-            return NOT_FOUND.getDescription();
+            log.error("Юзер с ID: {} не найден или не удалось обновить", user.getId());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Юзер с ID: " + user.getId() + " не найден или не удалось обновить");
         }
     }
 
     @GetMapping("/users")
-    public List<User> getUsers(){
+    public Collection<User> getUsers(){
         log.info("Получение всех юзеров");
-        List<User> users = new ArrayList<>(userService.getUsers());
-        log.debug("Количество пользователей: " + userService.getUsers().size());
+        List<User> users = new ArrayList<>(userServiceImpl.getUsers());
+        log.debug("Количество пользователей: " + userServiceImpl.getUsers().size());
         return users;
     }
 

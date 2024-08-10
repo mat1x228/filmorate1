@@ -1,65 +1,62 @@
-package ru.yandex.practicum.filmorate.src.main.controller;
+package main.controller;
 
-import ch.qos.logback.classic.Level;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import main.model.Film;
+import main.interfaces.FilmServiceImpl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.src.main.model.Film;
-import ru.yandex.practicum.filmorate.src.main.storageService.FilmService;
-import ru.yandex.practicum.filmorate.src.main.validator.Validator;
+import org.springframework.web.server.ResponseStatusException;
 
+import javax.validation.Valid;
+import java.util.Collection;
 import java.util.List;
-
-import static ru.yandex.practicum.filmorate.src.main.enums.StatusEnums.*;
 
 
 @RestController
-@RequestMapping("/api/filmorate")
+@Slf4j
+@RequestMapping("/api")
+@Validated
 public class FilmController {
 
-    private static final Logger log = LoggerFactory.getLogger(Validator.class);
+    private FilmServiceImpl filmServiceImpl = new FilmServiceImpl();
 
-    static {
-        ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME))
-                .setLevel(Level.INFO);
-    }
-
-    FilmService filmService = new FilmService();
-
-    @GetMapping
-    public String homePage() {
-        return "Film Raiting";
-    }
     @GetMapping("/films")
-    public List<Film> getAllFilms() {
-        log.info("Получение всех фильмов: " + filmService.getFilms().size());
-       return filmService.getFilms();
+    public Collection<Film> getAllFilms() {
+        log.info("Получение всех фильмов: " + filmServiceImpl.getFilms().size());
+        List<Film> films = filmServiceImpl.getFilms();
+       return films;
     }
 
     @PostMapping("/film")
-    public String createFilm(@RequestBody Film film) {
-        if (Validator.isValid(film)) {
-            log.info("Фильм создан: {}", film.getName());
-            filmService.createFilm(film);
-            log.trace("Название фильма: {}, Описание фильма: {}, Дата выхода фильма: {}, Продолжительность фильма: {}",
-                    film.getName(), film.getDescription(), film.getReleaseDate(), film.getDuration());
-            return CREATE_STATUS.getDescription() + film.getName();
-        } else {
-            return NOT_FOUND.getDescription();
+    public ResponseEntity<Film> createFilm(@Valid @RequestBody Film film) {
+        Film createdFilm = filmServiceImpl.createFilm(film);
+
+        if (createdFilm == null) {
+            log.error("Фильм не был создан");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Фильм " + film.getName() + " не удалось создать");
         }
+
+        log.info("Фильм создан: {}", film.getName());
+        log.trace("Название фильма: {}, Описание фильма: {}, Дата выхода фильма: {}, Продолжительность фильма: {}",
+                film.getName(), film.getDescription(), film.getReleaseDate(), film.getDuration());
+
+        return ResponseEntity.ok().body(createdFilm);
     }
 
 
     @PutMapping("/film/{id}")
-    public String updateFilm(@RequestBody Film film){
-        log.info("Обновление фильм");
-        boolean filmUpdated = filmService.updateFilm(film);
-        if (filmUpdated) {
+    public ResponseEntity<Film> updateFilm(@Valid @RequestBody Film film) {
+        log.info("Обновление фильма с ID: {}", film.getId());
+        Film filmUpdated = filmServiceImpl.updateFilm(film);
+        if (filmUpdated != null) {
             log.trace("Название фильма: {}, Описание фильма: {}, Дата выхода фильма: {}, Продолжительность фильма: {}",
                     film.getName(), film.getDescription(), film.getReleaseDate(), film.getDuration());
-            return UPDATE_STATUS.getDescription();
+            return ResponseEntity.ok().build();
         } else {
-            return NOT_FOUND.getDescription();
+            log.error("Фильм с ID: {} не найден или не удалось обновить", film.getId());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Фильм с ID: " + film.getId() + " не найден или не удалось обновить");
         }
     }
 
